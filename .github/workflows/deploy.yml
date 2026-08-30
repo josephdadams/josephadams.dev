@@ -1,0 +1,50 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish; queue at most one more.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Stage only what should be served, so README.md, .claude/ and the
+      # workflow itself don't end up published.
+      #
+      # To preview at the github.io URL before the DNS cutover, drop CNAME
+      # from the copy below — while that file is published, Pages redirects
+      # the github.io URL to josephadams.dev.
+      - name: Stage site
+        run: |
+          mkdir _site
+          cp -R index.html assets robots.txt sitemap.xml CNAME _site/
+          ls -R _site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
